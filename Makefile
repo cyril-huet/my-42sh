@@ -10,7 +10,8 @@ INCLUDES = -Iinclude
 SRC = src/main.c \
       src/lexer/lexer.c \
       src/parser/parser.c \
-      src/executor/executor.c
+      src/executor/executor.c \
+      src/builtins/builtins.c
 
 OBJ = $(SRC:.c=.o)
 

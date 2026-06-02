@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "builtins.h"
 #include "executor.h"
 #include "lexer.h"
 #include "parser.h"
@@ -33,7 +34,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    result = execute_command(&command);
+    if (is_builtin(&command) == 1)
+    {
+        result = execute_builtin(&command);
+    }
+    else
+    {
+        result = execute_command(&command);
+    }
 
     command_free(&command);
     token_list_free(&tokens);
