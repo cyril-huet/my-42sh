@@ -1,0 +1,8 @@
+# Program
+my-42sh
+
+# Object files
+*.o
+
+# Test files
+*.log
