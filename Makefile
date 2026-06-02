@@ -7,11 +7,11 @@ CFLAGS = -std=c99 -Wall -Wextra -Werror -pedantic -Wvla
 INCLUDES = -Iinclude
 
 # Source and object files
-SRC = src/main.c
+SRC = src/main.c \
+      src/lexer/lexer.c
+
 OBJ = $(SRC:.c=.o)
 
-# Files checked by clang-format
-FORMAT_FILES = $(SRC)
 
 # Build the shell
 all: $(NAME)
