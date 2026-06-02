@@ -1,18 +1,20 @@
 #include <stdio.h>
 
 #include "lexer.h"
+#include "parser.h"
 
-static void print_tokens(const struct token_list *list)
+static void print_command(const struct command *command)
 {
-    for (int i = 0; i < list->count; i++)
+    for (int i = 0; i < command->count; i++)
     {
-        printf("%s\n", list->items[i].value);
+        printf("argument %d: %s\n", i, command->arguments[i]);
     }
 }
 
 int main(int argc, char **argv)
 {
-    struct token_list list;
+    struct token_list tokens;
+    struct command command;
 
     if (argc != 2)
     {
@@ -20,16 +22,26 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    token_list_init(&list);
+    token_list_init(&tokens);
+    command_init(&command);
 
-    if (lexer_run(argv[1], &list) < 0)
+    if (lexer_run(argv[1], &tokens) < 0)
     {
-        fprintf(stderr, "my-42sh: memory allocation failed\n");
+        fprintf(stderr, "my-42sh: lexer error\n");
+        token_list_free(&tokens);
         return 1;
     }
 
-    print_tokens(&list);
-    token_list_free(&list);
+    if (parser_run(&tokens, &command) < 0)
+    {
+        fprintf(stderr, "my-42sh: parser error\n");
+        token_list_free(&tokens);
+        return 1;
+    }
 
+    print_command(&command);
+
+    command_free(&command);
+    token_list_free(&tokens);
     return 0;
 }

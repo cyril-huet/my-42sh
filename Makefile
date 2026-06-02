@@ -8,7 +8,8 @@ INCLUDES = -Iinclude
 
 # Source and object files
 SRC = src/main.c \
-      src/lexer/lexer.c
+      src/lexer/lexer.c \
+      src/parser/parser.c
 
 OBJ = $(SRC:.c=.o)
 
