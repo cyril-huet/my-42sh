@@ -1,20 +1,14 @@
 #include <stdio.h>
 
+#include "executor.h"
 #include "lexer.h"
 #include "parser.h"
-
-static void print_command(const struct command *command)
-{
-    for (int i = 0; i < command->count; i++)
-    {
-        printf("argument %d: %s\n", i, command->arguments[i]);
-    }
-}
 
 int main(int argc, char **argv)
 {
     struct token_list tokens;
     struct command command;
+    int result;
 
     if (argc != 2)
     {
@@ -39,9 +33,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    print_command(&command);
+    result = execute_command(&command);
 
     command_free(&command);
     token_list_free(&tokens);
-    return 0;
+
+    return result;
 }

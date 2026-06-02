@@ -57,7 +57,7 @@ static int add_argument(struct command *command, const char *value)
 {
     char *copy;
 
-    if (command->count == command->capacity)
+    if (command->count + 1 >= command->capacity)
     {
         if (increase_capacity(command) < 0)
         {
@@ -73,6 +73,8 @@ static int add_argument(struct command *command, const char *value)
 
     command->arguments[command->count] = copy;
     command->count++;
+    command->arguments[command->count] = NULL;
+
     return 0;
 }
 
