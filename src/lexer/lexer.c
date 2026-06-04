@@ -12,22 +12,35 @@ static int is_space_character(char character)
     return 0;
 }
 
-static char *copy_word(const char *line, int start, int length)
+static int text_length(const char *text)
 {
-    char *word = malloc(sizeof(char) * (length + 1));
+    int length = 0;
 
-    if (word == NULL)
+    while (text[length] != '\0')
+    {
+        length++;
+    }
+
+    return length;
+}
+
+static char *copy_word(const char *word)
+{
+    int length = text_length(word);
+    char *copy = malloc(sizeof(char) * (length + 1));
+
+    if (copy == NULL)
     {
         return NULL;
     }
 
     for (int i = 0; i < length; i++)
     {
-        word[i] = line[start + i];
+        copy[i] = word[i];
     }
 
-    word[length] = '\0';
-    return word;
+    copy[length] = '\0';
+    return copy;
 }
 
 static int increase_capacity(struct token_list *list)
@@ -44,7 +57,8 @@ static int increase_capacity(struct token_list *list)
         new_capacity = list->capacity * 2;
     }
 
-    new_items = realloc(list->items, sizeof(struct token) * new_capacity);
+    new_items =
+        realloc(list->items, sizeof(struct token) * new_capacity);
 
     if (new_items == NULL)
     {
@@ -56,10 +70,9 @@ static int increase_capacity(struct token_list *list)
     return 0;
 }
 
-static int add_token(struct token_list *list, const char *line, int start,
-                     int length)
+static int add_token(struct token_list *list, const char *word)
 {
-    char *word;
+    char *copy;
 
     if (list->count == list->capacity)
     {
@@ -69,15 +82,69 @@ static int add_token(struct token_list *list, const char *line, int start,
         }
     }
 
-    word = copy_word(line, start, length);
-    if (word == NULL)
+    copy = copy_word(word);
+    if (copy == NULL)
     {
         return -1;
     }
 
-    list->items[list->count].value = word;
+    list->items[list->count].value = copy;
     list->count++;
     return 0;
+}
+
+static int read_word(const char *line, int *index, char *word)
+{
+    char quote = '\0';
+    int length = 0;
+    int started = 0;
+
+    while (line[*index] != '\0')
+    {
+        char current = line[*index];
+
+        if (quote != '\0')
+        {
+            if (current == quote)
+            {
+                quote = '\0';
+            }
+            else
+            {
+                word[length] = current;
+                length++;
+            }
+
+            (*index)++;
+            continue;
+        }
+
+        if (current == '\'' || current == '"')
+        {
+            quote = current;
+            started = 1;
+            (*index)++;
+            continue;
+        }
+
+        if (is_space_character(current) == 1)
+        {
+            break;
+        }
+
+        word[length] = current;
+        length++;
+        started = 1;
+        (*index)++;
+    }
+
+    if (quote != '\0')
+    {
+        return -1;
+    }
+
+    word[length] = '\0';
+    return started;
 }
 
 void token_list_init(struct token_list *list)
@@ -104,11 +171,14 @@ void token_list_free(struct token_list *list)
 int lexer_run(const char *line, struct token_list *list)
 {
     int index = 0;
-    int start;
+    int line_size = text_length(line);
 
     while (line[index] != '\0')
     {
-        while (line[index] != '\0' && is_space_character(line[index]) == 1)
+        char *word;
+        int result;
+
+        while (is_space_character(line[index]) == 1)
         {
             index++;
         }
@@ -118,18 +188,29 @@ int lexer_run(const char *line, struct token_list *list)
             break;
         }
 
-        start = index;
-
-        while (line[index] != '\0' && is_space_character(line[index]) == 0)
-        {
-            index++;
-        }
-
-        if (add_token(list, line, start, index - start) < 0)
+        word = malloc(sizeof(char) * (line_size + 1));
+        if (word == NULL)
         {
             token_list_free(list);
             return -1;
         }
+
+        result = read_word(line, &index, word);
+        if (result < 0)
+        {
+            free(word);
+            token_list_free(list);
+            return -1;
+        }
+
+        if (result == 1 && add_token(list, word) < 0)
+        {
+            free(word);
+            token_list_free(list);
+            return -1;
+        }
+
+        free(word);
     }
 
     return 0;
