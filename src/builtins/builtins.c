@@ -79,6 +79,45 @@ static int run_env(void)
     return 0;
 }
 
+static int run_cd(const struct command *command)
+{
+    const char *path;
+
+    if (command->count > 2)
+    {
+        fprintf(stderr, "my-42sh: cd: too many arguments\n");
+        return 1;
+    }
+
+    if (command->count == 1)
+    {
+        path = getenv("HOME");
+
+        if (path == NULL)
+        {
+            fprintf(stderr, "my-42sh: cd: HOME is not set\n");
+            return 1;
+        }
+    }
+    else
+    {
+        path = command->arguments[1];
+    }
+
+    if (chdir(path) < 0)
+    {
+        perror("my-42sh: cd");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int run_exit(void)
+{
+    return 2;
+}
+
 int is_builtin(const struct command *command)
 {
     if (command->count == 0)
@@ -101,7 +140,27 @@ int is_builtin(const struct command *command)
         return 1;
     }
 
+    if (same_text(command->arguments[0], "cd") == 1)
+    {
+        return 1;
+    }
+
+    if (same_text(command->arguments[0], "exit") == 1)
+    {
+        return 1;
+    }
+
     return 0;
+}
+
+int is_exit_builtin(const struct command *command)
+{
+    if (command->count == 0)
+    {
+        return 0;
+    }
+
+    return same_text(command->arguments[0], "exit");
 }
 
 int execute_builtin(const struct command *command)
@@ -119,6 +178,16 @@ int execute_builtin(const struct command *command)
     if (same_text(command->arguments[0], "env") == 1)
     {
         return run_env();
+    }
+
+    if (same_text(command->arguments[0], "cd") == 1)
+    {
+        return run_cd(command);
+    }
+
+    if (same_text(command->arguments[0], "exit") == 1)
+    {
+        return run_exit();
     }
 
     return 1;

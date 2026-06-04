@@ -4,6 +4,7 @@
 #include "parser.h"
 
 int is_builtin(const struct command *command);
+int is_exit_builtin(const struct command *command);
 int execute_builtin(const struct command *command);
 
 #endif /* ! BUILTINS_H */

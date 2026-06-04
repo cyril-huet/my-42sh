@@ -66,6 +66,7 @@ int shell_run_line(const char *line)
 int shell_run(void)
 {
     char line[MAX_LINE_LENGTH];
+    int result = 0;
 
     while (1)
     {
@@ -85,8 +86,13 @@ int shell_run(void)
             continue;
         }
 
-        shell_run_line(line);
+        result = shell_run_line(line);
+
+        if (result == 2)
+        {
+            break;
+        }
     }
 
-    return 0;
+    return result;
 }
