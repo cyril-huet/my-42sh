@@ -28,7 +28,7 @@ $(NAME): $(OBJ)
 
 # Format the source files
 format:
-	clang-format -i $(FORMAT_FILES)
+	find include src tests -type f \( -name "*.h" -o -name "*.c" \) -exec clang-format -i {} +
 
 check-format:
 	clang-format --dry-run -Werror $(FORMAT_FILES)

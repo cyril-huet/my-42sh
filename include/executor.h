@@ -3,6 +3,6 @@
 
 #include "parser.h"
 
-int execute_command(const struct command *command);
+int execute_pipeline(const struct pipeline *pipeline);
 
 #endif /* ! EXECUTOR_H */

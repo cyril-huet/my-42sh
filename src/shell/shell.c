@@ -28,11 +28,11 @@ static void remove_newline(char *line)
 int shell_run_line(const char *line)
 {
     struct token_list tokens;
-    struct command command;
+    struct pipeline pipeline;
     int result;
 
     token_list_init(&tokens);
-    command_init(&command);
+    pipeline_init(&pipeline);
 
     if (lexer_run(line, &tokens) < 0)
     {
@@ -41,23 +41,24 @@ int shell_run_line(const char *line)
         return 1;
     }
 
-    if (parser_run(&tokens, &command) < 0)
+    if (parser_run(&tokens, &pipeline) < 0)
     {
         fprintf(stderr, "my-42sh: parser error\n");
         token_list_free(&tokens);
         return 1;
     }
 
-    if (is_builtin(&command) == 1)
+    if (pipeline.count == 1
+        && is_builtin(&pipeline.commands[0]) == 1)
     {
-        result = execute_builtin(&command);
+        result = execute_builtin(&pipeline.commands[0]);
     }
     else
     {
-        result = execute_command(&command);
+        result = execute_pipeline(&pipeline);
     }
 
-    command_free(&command);
+    pipeline_free(&pipeline);
     token_list_free(&tokens);
 
     return result;
