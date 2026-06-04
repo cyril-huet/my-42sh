@@ -49,6 +49,7 @@ int shell_run_line(const char *line)
     }
 
     if (pipeline.count == 1
+        && pipeline.commands[0].redirection_count == 0
         && is_builtin(&pipeline.commands[0]) == 1)
     {
         result = execute_builtin(&pipeline.commands[0]);

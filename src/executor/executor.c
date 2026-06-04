@@ -1,11 +1,49 @@
 #include "executor.h"
 
-#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+static int apply_redirections(const struct command *command)
+{
+    for (int i = 0; i < command->redirection_count; i++)
+    {
+        int file;
+        int output;
+
+        if (command->redirections[i].type == REDIRECTION_INPUT)
+        {
+            file = open(command->redirections[i].file, O_RDONLY);
+            output = STDIN_FILENO;
+        }
+        else
+        {
+            file = open(command->redirections[i].file,
+                        O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            output = STDOUT_FILENO;
+        }
+
+        if (file < 0)
+        {
+            perror(command->redirections[i].file);
+            return -1;
+        }
+
+        if (dup2(file, output) < 0)
+        {
+            perror("my-42sh: dup2");
+            close(file);
+            return -1;
+        }
+
+        close(file);
+    }
+
+    return 0;
+}
 
 static void start_child(const struct command *command, int input_fd,
                         int output_fd)
@@ -30,6 +68,11 @@ static void start_child(const struct command *command, int input_fd,
     if (output_fd >= 0)
     {
         close(output_fd);
+    }
+
+    if (apply_redirections(command) < 0)
+    {
+        exit(1);
     }
 
     execvp(command->arguments[0], command->arguments);
@@ -87,12 +130,6 @@ int execute_pipeline(const struct pipeline *pipeline)
         if (i < pipeline->count - 1 && pipe(pipe_fds) < 0)
         {
             perror("my-42sh: pipe");
-
-            if (input_fd >= 0)
-            {
-                close(input_fd);
-            }
-
             free(children);
             return 1;
         }
@@ -102,14 +139,6 @@ int execute_pipeline(const struct pipeline *pipeline)
         if (child < 0)
         {
             perror("my-42sh: fork");
-
-            if (input_fd >= 0)
-            {
-                close(input_fd);
-            }
-
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
             free(children);
             return 1;
         }

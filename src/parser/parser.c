@@ -63,7 +63,8 @@ static int increase_command_capacity(struct command *command)
         new_capacity = command->capacity * 2;
     }
 
-    new_arguments = realloc(command->arguments, sizeof(char *) * new_capacity);
+    new_arguments =
+        realloc(command->arguments, sizeof(char *) * new_capacity);
 
     if (new_arguments == NULL)
     {
@@ -96,6 +97,58 @@ static int add_argument(struct command *command, const char *value)
     command->arguments[command->count] = copy;
     command->count++;
     command->arguments[command->count] = NULL;
+
+    return 0;
+}
+
+static int increase_redirection_capacity(struct command *command)
+{
+    int new_capacity;
+    struct redirection *new_redirections;
+
+    if (command->redirection_capacity == 0)
+    {
+        new_capacity = 2;
+    }
+    else
+    {
+        new_capacity = command->redirection_capacity * 2;
+    }
+
+    new_redirections = realloc(
+        command->redirections, sizeof(struct redirection) * new_capacity);
+
+    if (new_redirections == NULL)
+    {
+        return -1;
+    }
+
+    command->redirections = new_redirections;
+    command->redirection_capacity = new_capacity;
+    return 0;
+}
+
+static int add_redirection(struct command *command, int type, const char *file)
+{
+    char *copy;
+
+    if (command->redirection_count == command->redirection_capacity)
+    {
+        if (increase_redirection_capacity(command) < 0)
+        {
+            return -1;
+        }
+    }
+
+    copy = copy_text(file);
+    if (copy == NULL)
+    {
+        return -1;
+    }
+
+    command->redirections[command->redirection_count].type = type;
+    command->redirections[command->redirection_count].file = copy;
+    command->redirection_count++;
 
     return 0;
 }
@@ -144,11 +197,29 @@ static int add_command(struct pipeline *pipeline, struct command *command)
     return 0;
 }
 
+static int redirection_type(const char *value)
+{
+    if (same_text(value, "<") == 1)
+    {
+        return REDIRECTION_INPUT;
+    }
+
+    if (same_text(value, ">") == 1)
+    {
+        return REDIRECTION_OUTPUT;
+    }
+
+    return 0;
+}
+
 void command_init(struct command *command)
 {
     command->arguments = NULL;
     command->count = 0;
     command->capacity = 0;
+    command->redirections = NULL;
+    command->redirection_count = 0;
+    command->redirection_capacity = 0;
 }
 
 void command_free(struct command *command)
@@ -158,11 +229,20 @@ void command_free(struct command *command)
         free(command->arguments[i]);
     }
 
+    for (int i = 0; i < command->redirection_count; i++)
+    {
+        free(command->redirections[i].file);
+    }
+
     free(command->arguments);
+    free(command->redirections);
 
     command->arguments = NULL;
     command->count = 0;
     command->capacity = 0;
+    command->redirections = NULL;
+    command->redirection_count = 0;
+    command->redirection_capacity = 0;
 }
 
 void pipeline_init(struct pipeline *pipeline)
@@ -194,14 +274,45 @@ int parser_run(const struct token_list *tokens, struct pipeline *pipeline)
 
     for (int i = 0; i < tokens->count; i++)
     {
+        int type = redirection_type(tokens->items[i].value);
+
         if (same_text(tokens->items[i].value, "|") == 1)
         {
-            if (current.count == 0 || add_command(pipeline, &current) < 0)
+            if (current.count == 0
+                || add_command(pipeline, &current) < 0)
             {
                 command_free(&current);
                 pipeline_free(pipeline);
                 return -1;
             }
+        }
+        else if (type != 0)
+        {
+            if (i + 1 >= tokens->count
+                || same_text(tokens->items[i + 1].value, "|") == 1
+                || redirection_type(tokens->items[i + 1].value) != 0
+                || same_text(tokens->items[i + 1].value, ">>") == 1)
+            {
+                command_free(&current);
+                pipeline_free(pipeline);
+                return -1;
+            }
+
+            if (add_redirection(&current, type, tokens->items[i + 1].value)
+                < 0)
+            {
+                command_free(&current);
+                pipeline_free(pipeline);
+                return -1;
+            }
+
+            i++;
+        }
+        else if (same_text(tokens->items[i].value, ">>") == 1)
+        {
+            command_free(&current);
+            pipeline_free(pipeline);
+            return -1;
         }
         else if (add_argument(&current, tokens->items[i].value) < 0)
         {
