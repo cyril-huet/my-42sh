@@ -209,6 +209,11 @@ static int redirection_type(const char *value)
         return REDIRECTION_OUTPUT;
     }
 
+    if (same_text(value, ">>") == 1)
+    {
+        return REDIRECTION_APPEND;
+    }
+
     return 0;
 }
 
@@ -290,8 +295,7 @@ int parser_run(const struct token_list *tokens, struct pipeline *pipeline)
         {
             if (i + 1 >= tokens->count
                 || same_text(tokens->items[i + 1].value, "|") == 1
-                || redirection_type(tokens->items[i + 1].value) != 0
-                || same_text(tokens->items[i + 1].value, ">>") == 1)
+                || redirection_type(tokens->items[i + 1].value) != 0)
             {
                 command_free(&current);
                 pipeline_free(pipeline);
@@ -307,12 +311,6 @@ int parser_run(const struct token_list *tokens, struct pipeline *pipeline)
             }
 
             i++;
-        }
-        else if (same_text(tokens->items[i].value, ">>") == 1)
-        {
-            command_free(&current);
-            pipeline_free(pipeline);
-            return -1;
         }
         else if (add_argument(&current, tokens->items[i].value) < 0)
         {

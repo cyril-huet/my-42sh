@@ -7,6 +7,25 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+static int open_redirection(const struct redirection *redirection)
+{
+    if (redirection->type == REDIRECTION_INPUT)
+    {
+        return open(redirection->file, O_RDONLY);
+    }
+
+    if (redirection->type == REDIRECTION_OUTPUT)
+    {
+        return open(redirection->file,
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                    0644);
+    }
+
+    return open(redirection->file,
+                O_WRONLY | O_CREAT | O_APPEND,
+                0644);
+}
+
 static int apply_redirections(const struct command *command)
 {
     for (int i = 0; i < command->redirection_count; i++)
@@ -14,22 +33,20 @@ static int apply_redirections(const struct command *command)
         int file;
         int output;
 
-        if (command->redirections[i].type == REDIRECTION_INPUT)
-        {
-            file = open(command->redirections[i].file, O_RDONLY);
-            output = STDIN_FILENO;
-        }
-        else
-        {
-            file = open(command->redirections[i].file,
-                        O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            output = STDOUT_FILENO;
-        }
-
+        file = open_redirection(&command->redirections[i]);
         if (file < 0)
         {
             perror(command->redirections[i].file);
             return -1;
+        }
+
+        if (command->redirections[i].type == REDIRECTION_INPUT)
+        {
+            output = STDIN_FILENO;
+        }
+        else
+        {
+            output = STDOUT_FILENO;
         }
 
         if (dup2(file, output) < 0)
