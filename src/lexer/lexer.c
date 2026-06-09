@@ -57,8 +57,7 @@ static int increase_capacity(struct token_list *list)
         new_capacity = list->capacity * 2;
     }
 
-    new_items =
-        realloc(list->items, sizeof(struct token) * new_capacity);
+    new_items = realloc(list->items, sizeof(struct token) * new_capacity);
 
     if (new_items == NULL)
     {
@@ -127,13 +126,22 @@ static int read_word(const char *line, int *index, char *word)
             continue;
         }
 
-        if (current == '|' || current == '<' || current == '>')
+        if (current == '|' || current == '&' || current == '<'
+            || current == '>')
         {
             if (started == 0)
             {
                 word[0] = current;
                 length = 1;
                 (*index)++;
+
+                if ((current == '|' || current == '&')
+                    && line[*index] == current)
+                {
+                    word[length] = current;
+                    length++;
+                    (*index)++;
+                }
 
                 if (current == '>' && line[*index] == '>')
                 {
