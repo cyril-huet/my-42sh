@@ -16,14 +16,10 @@ static int open_redirection(const struct redirection *redirection)
 
     if (redirection->type == REDIRECTION_OUTPUT)
     {
-        return open(redirection->file,
-                    O_WRONLY | O_CREAT | O_TRUNC,
-                    0644);
+        return open(redirection->file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     }
 
-    return open(redirection->file,
-                O_WRONLY | O_CREAT | O_APPEND,
-                0644);
+    return open(redirection->file, O_WRONLY | O_CREAT | O_APPEND, 0644);
 }
 
 static int apply_redirections(const struct command *command)
@@ -141,7 +137,7 @@ int execute_pipeline(const struct pipeline *pipeline)
 
     for (int i = 0; i < pipeline->count; i++)
     {
-        int pipe_fds[2] = {-1, -1};
+        int pipe_fds[2] = { -1, -1 };
         pid_t child;
 
         if (i < pipeline->count - 1 && pipe(pipe_fds) < 0)

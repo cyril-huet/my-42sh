@@ -2,28 +2,6 @@
 
 #include <stdlib.h>
 
-static int same_text(const char *first, const char *second)
-{
-    int index = 0;
-
-    while (first[index] != '\0' && second[index] != '\0')
-    {
-        if (first[index] != second[index])
-        {
-            return 0;
-        }
-
-        index++;
-    }
-
-    if (first[index] == '\0' && second[index] == '\0')
-    {
-        return 1;
-    }
-
-    return 0;
-}
-
 static char *copy_text(const char *text)
 {
     int length = 0;
@@ -63,8 +41,7 @@ static int increase_command_capacity(struct command *command)
         new_capacity = command->capacity * 2;
     }
 
-    new_arguments =
-        realloc(command->arguments, sizeof(char *) * new_capacity);
+    new_arguments = realloc(command->arguments, sizeof(char *) * new_capacity);
 
     if (new_arguments == NULL)
     {
@@ -115,8 +92,8 @@ static int increase_redirection_capacity(struct command *command)
         new_capacity = command->redirection_capacity * 2;
     }
 
-    new_redirections = realloc(
-        command->redirections, sizeof(struct redirection) * new_capacity);
+    new_redirections = realloc(command->redirections,
+                               sizeof(struct redirection) * new_capacity);
 
     if (new_redirections == NULL)
     {
@@ -197,24 +174,108 @@ static int add_command(struct pipeline *pipeline, struct command *command)
     return 0;
 }
 
-static int redirection_type(const char *value)
+static int increase_list_capacity(struct command_list *list)
 {
-    if (same_text(value, "<") == 1)
+    int new_capacity;
+    struct pipeline *new_pipelines;
+
+    if (list->capacity == 0)
     {
-        return REDIRECTION_INPUT;
+        new_capacity = 2;
+    }
+    else
+    {
+        new_capacity = list->capacity * 2;
     }
 
-    if (same_text(value, ">") == 1)
+    new_pipelines =
+        realloc(list->pipelines, sizeof(struct pipeline) * new_capacity);
+
+    if (new_pipelines == NULL)
     {
-        return REDIRECTION_OUTPUT;
+        return -1;
     }
 
-    if (same_text(value, ">>") == 1)
-    {
-        return REDIRECTION_APPEND;
-    }
-
+    list->pipelines = new_pipelines;
+    list->capacity = new_capacity;
     return 0;
+}
+
+static int add_pipeline(struct command_list *list, struct pipeline *pipeline)
+{
+    if (list->count == list->capacity)
+    {
+        if (increase_list_capacity(list) < 0)
+        {
+            return -1;
+        }
+    }
+
+    list->pipelines[list->count] = *pipeline;
+    list->count++;
+
+    pipeline_init(pipeline);
+    return 0;
+}
+
+static int increase_operator_capacity(struct command_list *list)
+{
+    int new_capacity;
+    int *new_operators;
+
+    if (list->operator_capacity == 0)
+    {
+        new_capacity = 2;
+    }
+    else
+    {
+        new_capacity = list->operator_capacity * 2;
+    }
+
+    new_operators = realloc(list->operators, sizeof(int) * new_capacity);
+
+    if (new_operators == NULL)
+    {
+        return -1;
+    }
+
+    list->operators = new_operators;
+    list->operator_capacity = new_capacity;
+    return 0;
+}
+
+static int add_operator(struct command_list *list, int operator)
+{
+    if (list->operator_count == list->operator_capacity)
+    {
+        if (increase_operator_capacity(list) < 0)
+        {
+            return -1;
+        }
+    }
+
+    list->operators[list->operator_count] = operator;
+    list->operator_count++;
+    return 0;
+}
+
+static int finish_command(struct pipeline *pipeline, struct command *command)
+{
+    if (command->count == 0)
+    {
+        return -1;
+    }
+
+    return add_command(pipeline, command);
+}
+
+static int parser_error(struct command_list *list, struct pipeline *pipeline,
+                        struct command *command)
+{
+    command_free(command);
+    pipeline_free(pipeline);
+    command_list_free(list);
+    return -1;
 }
 
 void command_init(struct command *command)
@@ -271,68 +332,128 @@ void pipeline_free(struct pipeline *pipeline)
     pipeline->capacity = 0;
 }
 
-int parser_run(const struct token_list *tokens, struct pipeline *pipeline)
+void command_list_init(struct command_list *list)
 {
-    struct command current;
+    list->pipelines = NULL;
+    list->count = 0;
+    list->capacity = 0;
+    list->operators = NULL;
+    list->operator_count = 0;
+    list->operator_capacity = 0;
+}
 
-    command_init(&current);
+void command_list_free(struct command_list *list)
+{
+    for (int i = 0; i < list->count; i++)
+    {
+        pipeline_free(&list->pipelines[i]);
+    }
+
+    free(list->pipelines);
+    free(list->operators);
+
+    list->pipelines = NULL;
+    list->count = 0;
+    list->capacity = 0;
+    list->operators = NULL;
+    list->operator_count = 0;
+    list->operator_capacity = 0;
+}
+
+int parser_run(const struct token_list *tokens, struct command_list *list)
+{
+    struct pipeline current_pipeline;
+    struct command current_command;
+
+    pipeline_init(&current_pipeline);
+    command_init(&current_command);
 
     for (int i = 0; i < tokens->count; i++)
     {
-        int type = redirection_type(tokens->items[i].value);
+        struct token *token = &tokens->items[i];
 
-        if (same_text(tokens->items[i].value, "|") == 1)
+        if (token->type == TOKEN_PIPE)
         {
-            if (current.count == 0
-                || add_command(pipeline, &current) < 0)
+            if (finish_command(&current_pipeline, &current_command) < 0)
             {
-                command_free(&current);
-                pipeline_free(pipeline);
-                return -1;
+                return parser_error(list, &current_pipeline, &current_command);
             }
         }
-        else if (type != 0)
+        else if (token->type == TOKEN_AND || token->type == TOKEN_OR)
         {
-            if (i + 1 >= tokens->count
-                || same_text(tokens->items[i + 1].value, "|") == 1
-                || redirection_type(tokens->items[i + 1].value) != 0)
+            int operator;
+
+            if (finish_command(&current_pipeline, &current_command) < 0
+                || current_pipeline.count == 0
+                || add_pipeline(list, &current_pipeline) < 0)
             {
-                command_free(&current);
-                pipeline_free(pipeline);
-                return -1;
+                return parser_error(list, &current_pipeline, &current_command);
             }
 
-            if (add_redirection(&current, type, tokens->items[i + 1].value)
+            if (token->type == TOKEN_AND)
+            {
+                operator= LOGICAL_AND;
+            }
+            else
+            {
+                operator= LOGICAL_OR;
+            }
+
+            if (add_operator(list, operator) < 0)
+            {
+                return parser_error(list, &current_pipeline, &current_command);
+            }
+        }
+        else if (token->type == TOKEN_REDIRECTION_INPUT
+                 || token->type == TOKEN_REDIRECTION_OUTPUT
+                 || token->type == TOKEN_REDIRECTION_APPEND)
+        {
+            int redirection;
+
+            if (i + 1 >= tokens->count
+                || tokens->items[i + 1].type != TOKEN_WORD)
+            {
+                return parser_error(list, &current_pipeline, &current_command);
+            }
+
+            if (token->type == TOKEN_REDIRECTION_INPUT)
+            {
+                redirection = REDIRECTION_INPUT;
+            }
+            else if (token->type == TOKEN_REDIRECTION_OUTPUT)
+            {
+                redirection = REDIRECTION_OUTPUT;
+            }
+            else
+            {
+                redirection = REDIRECTION_APPEND;
+            }
+
+            if (add_redirection(&current_command, redirection,
+                                tokens->items[i + 1].value)
                 < 0)
             {
-                command_free(&current);
-                pipeline_free(pipeline);
-                return -1;
+                return parser_error(list, &current_pipeline, &current_command);
             }
 
             i++;
         }
-        else if (add_argument(&current, tokens->items[i].value) < 0)
+        else if (add_argument(&current_command, token->value) < 0)
         {
-            command_free(&current);
-            pipeline_free(pipeline);
-            return -1;
+            return parser_error(list, &current_pipeline, &current_command);
         }
     }
 
-    if (current.count > 0)
+    if (tokens->count == 0)
     {
-        if (add_command(pipeline, &current) < 0)
-        {
-            command_free(&current);
-            pipeline_free(pipeline);
-            return -1;
-        }
+        return 0;
     }
-    else if (tokens->count > 0)
+
+    if (finish_command(&current_pipeline, &current_command) < 0
+        || current_pipeline.count == 0
+        || add_pipeline(list, &current_pipeline) < 0)
     {
-        pipeline_free(pipeline);
-        return -1;
+        return parser_error(list, &current_pipeline, &current_command);
     }
 
     return 0;

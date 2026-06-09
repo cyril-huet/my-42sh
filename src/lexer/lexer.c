@@ -69,7 +69,7 @@ static int increase_capacity(struct token_list *list)
     return 0;
 }
 
-static int add_token(struct token_list *list, const char *word)
+static int add_token(struct token_list *list, const char *word, int type)
 {
     char *copy;
 
@@ -88,15 +88,19 @@ static int add_token(struct token_list *list, const char *word)
     }
 
     list->items[list->count].value = copy;
+    list->items[list->count].type = type;
     list->count++;
+
     return 0;
 }
 
-static int read_word(const char *line, int *index, char *word)
+static int read_word(const char *line, int *index, char *word, int *type)
 {
     char quote = '\0';
     int length = 0;
     int started = 0;
+
+    *type = TOKEN_WORD;
 
     while (line[*index] != '\0')
     {
@@ -135,19 +139,47 @@ static int read_word(const char *line, int *index, char *word)
                 length = 1;
                 (*index)++;
 
-                if ((current == '|' || current == '&')
-                    && line[*index] == current)
+                if (current == '|')
                 {
-                    word[length] = current;
-                    length++;
-                    (*index)++;
+                    if (line[*index] == '|')
+                    {
+                        word[length] = '|';
+                        length++;
+                        (*index)++;
+                        *type = TOKEN_OR;
+                    }
+                    else
+                    {
+                        *type = TOKEN_PIPE;
+                    }
                 }
-
-                if (current == '>' && line[*index] == '>')
+                else if (current == '&')
                 {
-                    word[length] = '>';
-                    length++;
-                    (*index)++;
+                    if (line[*index] == '&')
+                    {
+                        word[length] = '&';
+                        length++;
+                        (*index)++;
+                        *type = TOKEN_AND;
+                    }
+                }
+                else if (current == '<')
+                {
+                    *type = TOKEN_REDIRECTION_INPUT;
+                }
+                else
+                {
+                    if (line[*index] == '>')
+                    {
+                        word[length] = '>';
+                        length++;
+                        (*index)++;
+                        *type = TOKEN_REDIRECTION_APPEND;
+                    }
+                    else
+                    {
+                        *type = TOKEN_REDIRECTION_OUTPUT;
+                    }
                 }
 
                 word[length] = '\0';
@@ -206,6 +238,7 @@ int lexer_run(const char *line, struct token_list *list)
     while (line[index] != '\0')
     {
         char *word;
+        int type;
         int result;
 
         while (is_space_character(line[index]) == 1)
@@ -225,7 +258,7 @@ int lexer_run(const char *line, struct token_list *list)
             return -1;
         }
 
-        result = read_word(line, &index, word);
+        result = read_word(line, &index, word, &type);
         if (result < 0)
         {
             free(word);
@@ -233,7 +266,7 @@ int lexer_run(const char *line, struct token_list *list)
             return -1;
         }
 
-        if (result == 1 && add_token(list, word) < 0)
+        if (result == 1 && add_token(list, word, type) < 0)
         {
             free(word);
             token_list_free(list);

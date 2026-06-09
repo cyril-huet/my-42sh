@@ -28,11 +28,12 @@ static void remove_newline(char *line)
 int shell_run_line(const char *line)
 {
     struct token_list tokens;
-    struct pipeline pipeline;
+    struct command_list commands;
+    struct pipeline *pipeline;
     int result;
 
     token_list_init(&tokens);
-    pipeline_init(&pipeline);
+    command_list_init(&commands);
 
     if (lexer_run(line, &tokens) < 0)
     {
@@ -41,25 +42,41 @@ int shell_run_line(const char *line)
         return 1;
     }
 
-    if (parser_run(&tokens, &pipeline) < 0)
+    if (parser_run(&tokens, &commands) < 0)
     {
         fprintf(stderr, "my-42sh: parser error\n");
         token_list_free(&tokens);
         return 1;
     }
 
-    if (pipeline.count == 1
-        && pipeline.commands[0].redirection_count == 0
-        && is_builtin(&pipeline.commands[0]) == 1)
+    if (commands.count == 0)
     {
-        result = execute_builtin(&pipeline.commands[0]);
+        command_list_free(&commands);
+        token_list_free(&tokens);
+        return 0;
+    }
+
+    if (commands.count > 1)
+    {
+        fprintf(stderr, "my-42sh: logical operators are not supported yet\n");
+        command_list_free(&commands);
+        token_list_free(&tokens);
+        return 1;
+    }
+
+    pipeline = &commands.pipelines[0];
+
+    if (pipeline->count == 1 && pipeline->commands[0].redirection_count == 0
+        && is_builtin(&pipeline->commands[0]) == 1)
+    {
+        result = execute_builtin(&pipeline->commands[0]);
     }
     else
     {
-        result = execute_pipeline(&pipeline);
+        result = execute_pipeline(pipeline);
     }
 
-    pipeline_free(&pipeline);
+    command_list_free(&commands);
     token_list_free(&tokens);
 
     return result;

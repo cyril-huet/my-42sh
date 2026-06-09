@@ -1,9 +1,18 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#define TOKEN_WORD 0
+#define TOKEN_PIPE 1
+#define TOKEN_AND 2
+#define TOKEN_OR 3
+#define TOKEN_REDIRECTION_INPUT 4
+#define TOKEN_REDIRECTION_OUTPUT 5
+#define TOKEN_REDIRECTION_APPEND 6
+
 struct token
 {
     char *value;
+    int type;
 };
 
 struct token_list

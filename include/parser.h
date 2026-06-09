@@ -7,6 +7,9 @@
 #define REDIRECTION_OUTPUT 2
 #define REDIRECTION_APPEND 3
 
+#define LOGICAL_AND 1
+#define LOGICAL_OR 2
+
 struct redirection
 {
     int type;
@@ -30,12 +33,25 @@ struct pipeline
     int capacity;
 };
 
+struct command_list
+{
+    struct pipeline *pipelines;
+    int count;
+    int capacity;
+    int *operators;
+    int operator_count;
+    int operator_capacity;
+};
+
 void command_init(struct command *command);
 void command_free(struct command *command);
 
 void pipeline_init(struct pipeline *pipeline);
 void pipeline_free(struct pipeline *pipeline);
 
-int parser_run(const struct token_list *tokens, struct pipeline *pipeline);
+void command_list_init(struct command_list *list);
+void command_list_free(struct command_list *list);
+
+int parser_run(const struct token_list *tokens, struct command_list *list);
 
 #endif /* ! PARSER_H */
