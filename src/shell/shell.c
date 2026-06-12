@@ -25,12 +25,23 @@ static void remove_newline(char *line)
     }
 }
 
+static int execute_one_pipeline(struct pipeline *pipeline)
+{
+    if (pipeline->count == 1
+        && pipeline->commands[0].redirection_count == 0
+        && is_builtin(&pipeline->commands[0]) == 1)
+    {
+        return execute_builtin(&pipeline->commands[0]);
+    }
+
+    return execute_pipeline(pipeline);
+}
+
 int shell_run_line(const char *line)
 {
     struct token_list tokens;
     struct command_list commands;
-    struct pipeline *pipeline;
-    int result;
+    int result = 0;
 
     token_list_init(&tokens);
     command_list_init(&commands);
@@ -49,31 +60,29 @@ int shell_run_line(const char *line)
         return 1;
     }
 
-    if (commands.count == 0)
+    for (int i = 0; i < commands.count; i++)
     {
-        command_list_free(&commands);
-        token_list_free(&tokens);
-        return 0;
-    }
+        result = execute_one_pipeline(&commands.pipelines[i]);
 
-    if (commands.count > 1)
-    {
-        fprintf(stderr, "my-42sh: logical operators are not supported yet\n");
-        command_list_free(&commands);
-        token_list_free(&tokens);
-        return 1;
-    }
+        if (result == 2)
+        {
+            break;
+        }
 
-    pipeline = &commands.pipelines[0];
+        if (i == commands.count - 1)
+        {
+            break;
+        }
 
-    if (pipeline->count == 1 && pipeline->commands[0].redirection_count == 0
-        && is_builtin(&pipeline->commands[0]) == 1)
-    {
-        result = execute_builtin(&pipeline->commands[0]);
-    }
-    else
-    {
-        result = execute_pipeline(pipeline);
+        if (commands.operators[i] == LOGICAL_AND && result != 0)
+        {
+            break;
+        }
+
+        if (commands.operators[i] == LOGICAL_OR && result == 0)
+        {
+            break;
+        }
     }
 
     command_list_free(&commands);
