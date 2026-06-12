@@ -130,8 +130,8 @@ static int read_word(const char *line, int *index, char *word, int *type)
             continue;
         }
 
-        if (current == '|' || current == '&' || current == '<'
-            || current == '>')
+        if (current == '|' || current == '&' || current == '<' || current == '>'
+            || current == ';')
         {
             if (started == 0)
             {
@@ -162,6 +162,10 @@ static int read_word(const char *line, int *index, char *word, int *type)
                         (*index)++;
                         *type = TOKEN_AND;
                     }
+                }
+                else if (current == ';')
+                {
+                    *type = TOKEN_SEQUENCE;
                 }
                 else if (current == '<')
                 {

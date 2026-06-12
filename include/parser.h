@@ -9,6 +9,7 @@
 
 #define LOGICAL_AND 1
 #define LOGICAL_OR 2
+#define LOGICAL_SEQUENCE 3
 
 struct redirection
 {

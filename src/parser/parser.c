@@ -379,7 +379,8 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
                 return parser_error(list, &current_pipeline, &current_command);
             }
         }
-        else if (token->type == TOKEN_AND || token->type == TOKEN_OR)
+        else if (token->type == TOKEN_AND || token->type == TOKEN_OR
+                 || token->type == TOKEN_SEQUENCE)
         {
             int operator;
 
@@ -394,9 +395,13 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
             {
                 operator= LOGICAL_AND;
             }
-            else
+            else if (token->type == TOKEN_OR)
             {
                 operator= LOGICAL_OR;
+            }
+            else
+            {
+                operator= LOGICAL_SEQUENCE;
             }
 
             if (add_operator(list, operator) < 0)
