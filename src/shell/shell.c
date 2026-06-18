@@ -6,6 +6,7 @@
 #include "executor.h"
 #include "lexer.h"
 #include "parser.h"
+#include "variables.h"
 
 #define MAX_LINE_LENGTH 4096
 
@@ -49,6 +50,13 @@ int shell_run_line(const char *line)
     if (lexer_run(line, &tokens) < 0)
     {
         fprintf(stderr, "my-42sh: lexer error\n");
+        token_list_free(&tokens);
+        return 1;
+    }
+
+    if (expand_token_list(&tokens) < 0)
+    {
+        fprintf(stderr, "my-42sh: variable expansion error\n");
         token_list_free(&tokens);
         return 1;
     }

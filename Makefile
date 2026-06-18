@@ -12,7 +12,8 @@ SRC = src/main.c \
       src/parser/parser.c \
       src/executor/executor.c \
       src/builtins/builtins.c \
-      src/shell/shell.c
+      src/shell/shell.c \
+      src/shell/variables.c
 
 OBJ = $(SRC:.c=.o)
 
