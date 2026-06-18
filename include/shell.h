@@ -1,7 +1,9 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-int shell_run(void);
-int shell_run_line(const char *line);
+#include "variables.h"
+
+int shell_run(struct shell_state *state);
+int shell_run_line(const char *line, struct shell_state *state);
 
 #endif /* ! SHELL_H */

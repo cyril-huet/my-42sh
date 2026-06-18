@@ -6,7 +6,6 @@
 #include "executor.h"
 #include "lexer.h"
 #include "parser.h"
-#include "variables.h"
 
 #define MAX_LINE_LENGTH 4096
 
@@ -28,8 +27,7 @@ static void remove_newline(char *line)
 
 static int execute_one_pipeline(struct pipeline *pipeline)
 {
-    if (pipeline->count == 1
-        && pipeline->commands[0].redirection_count == 0
+    if (pipeline->count == 1 && pipeline->commands[0].redirection_count == 0
         && is_builtin(&pipeline->commands[0]) == 1)
     {
         return execute_builtin(&pipeline->commands[0]);
@@ -38,7 +36,7 @@ static int execute_one_pipeline(struct pipeline *pipeline)
     return execute_pipeline(pipeline);
 }
 
-int shell_run_line(const char *line)
+int shell_run_line(const char *line, struct shell_state *state)
 {
     struct token_list tokens;
     struct command_list commands;
@@ -51,13 +49,15 @@ int shell_run_line(const char *line)
     {
         fprintf(stderr, "my-42sh: lexer error\n");
         token_list_free(&tokens);
+        state->last_status = 1;
         return 1;
     }
 
-    if (expand_token_list(&tokens) < 0)
+    if (expand_token_list(&tokens, state) < 0)
     {
         fprintf(stderr, "my-42sh: variable expansion error\n");
         token_list_free(&tokens);
+        state->last_status = 1;
         return 1;
     }
 
@@ -65,6 +65,7 @@ int shell_run_line(const char *line)
     {
         fprintf(stderr, "my-42sh: parser error\n");
         token_list_free(&tokens);
+        state->last_status = 1;
         return 1;
     }
 
@@ -93,13 +94,15 @@ int shell_run_line(const char *line)
         }
     }
 
+    state->last_status = result;
+
     command_list_free(&commands);
     token_list_free(&tokens);
 
     return result;
 }
 
-int shell_run(void)
+int shell_run(struct shell_state *state)
 {
     char line[MAX_LINE_LENGTH];
     int result = 0;
@@ -122,7 +125,7 @@ int shell_run(void)
             continue;
         }
 
-        result = shell_run_line(line);
+        result = shell_run_line(line, state);
 
         if (result == 2)
         {
