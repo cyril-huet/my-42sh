@@ -5,7 +5,6 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 #ifndef PATH_MAX
@@ -34,6 +33,98 @@ static int same_text(const char *first, const char *second)
     }
 
     return 0;
+}
+
+static int is_name_start(char character)
+{
+    if (character >= 'a' && character <= 'z')
+    {
+        return 1;
+    }
+
+    if (character >= 'A' && character <= 'Z')
+    {
+        return 1;
+    }
+
+    if (character == '_')
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int is_name_character(char character)
+{
+    if (is_name_start(character) == 1)
+    {
+        return 1;
+    }
+
+    if (character >= '0' && character <= '9')
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static char *copy_part(const char *text, int length)
+{
+    char *copy = malloc(sizeof(char) * (length + 1));
+
+    if (copy == NULL)
+    {
+        return NULL;
+    }
+
+    for (int i = 0; i < length; i++)
+    {
+        copy[i] = text[i];
+    }
+
+    copy[length] = '\0';
+    return copy;
+}
+
+static int valid_name(const char *name)
+{
+    int index = 0;
+
+    if (is_name_start(name[0]) == 0)
+    {
+        return 0;
+    }
+
+    while (name[index] != '\0')
+    {
+        if (is_name_character(name[index]) == 0)
+        {
+            return 0;
+        }
+
+        index++;
+    }
+
+    return 1;
+}
+
+static int find_equal(const char *text)
+{
+    int index = 0;
+
+    while (text[index] != '\0')
+    {
+        if (text[index] == '=')
+        {
+            return index;
+        }
+
+        index++;
+    }
+
+    return -1;
 }
 
 static int run_echo(const struct command *command)
@@ -113,6 +204,62 @@ static int run_cd(const struct command *command)
     return 0;
 }
 
+static int run_export(const struct command *command)
+{
+    if (command->count == 1)
+    {
+        return run_env();
+    }
+
+    for (int i = 1; i < command->count; i++)
+    {
+        int equal = find_equal(command->arguments[i]);
+        int name_length = equal;
+
+        if (equal < 0)
+        {
+            name_length = 0;
+
+            while (command->arguments[i][name_length] != '\0')
+            {
+                name_length++;
+            }
+        }
+
+        char *name = copy_part(command->arguments[i], name_length);
+        if (name == NULL)
+        {
+            fprintf(stderr, "my-42sh: export: memory allocation failed\n");
+            return 1;
+        }
+
+        if (valid_name(name) == 0)
+        {
+            fprintf(stderr, "my-42sh: export: invalid variable name\n");
+            free(name);
+            return 1;
+        }
+
+        const char *value = "";
+
+        if (equal >= 0)
+        {
+            value = command->arguments[i] + equal + 1;
+        }
+
+        if (setenv(name, value, 1) < 0)
+        {
+            perror("my-42sh: export");
+            free(name);
+            return 1;
+        }
+
+        free(name);
+    }
+
+    return 0;
+}
+
 static int run_exit(void)
 {
     return 2;
@@ -125,27 +272,12 @@ int is_builtin(const struct command *command)
         return 0;
     }
 
-    if (same_text(command->arguments[0], "echo") == 1)
-    {
-        return 1;
-    }
-
-    if (same_text(command->arguments[0], "pwd") == 1)
-    {
-        return 1;
-    }
-
-    if (same_text(command->arguments[0], "env") == 1)
-    {
-        return 1;
-    }
-
-    if (same_text(command->arguments[0], "cd") == 1)
-    {
-        return 1;
-    }
-
-    if (same_text(command->arguments[0], "exit") == 1)
+    if (same_text(command->arguments[0], "echo") == 1
+        || same_text(command->arguments[0], "pwd") == 1
+        || same_text(command->arguments[0], "env") == 1
+        || same_text(command->arguments[0], "cd") == 1
+        || same_text(command->arguments[0], "export") == 1
+        || same_text(command->arguments[0], "exit") == 1)
     {
         return 1;
     }
@@ -183,6 +315,11 @@ int execute_builtin(const struct command *command)
     if (same_text(command->arguments[0], "cd") == 1)
     {
         return run_cd(command);
+    }
+
+    if (same_text(command->arguments[0], "export") == 1)
+    {
+        return run_export(command);
     }
 
     if (same_text(command->arguments[0], "exit") == 1)
