@@ -215,6 +215,8 @@ static int run_export(const struct command *command)
     {
         int equal = find_equal(command->arguments[i]);
         int name_length = equal;
+        char *name;
+        const char *value = "";
 
         if (equal < 0)
         {
@@ -226,7 +228,7 @@ static int run_export(const struct command *command)
             }
         }
 
-        char *name = copy_part(command->arguments[i], name_length);
+        name = copy_part(command->arguments[i], name_length);
         if (name == NULL)
         {
             fprintf(stderr, "my-42sh: export: memory allocation failed\n");
@@ -239,8 +241,6 @@ static int run_export(const struct command *command)
             free(name);
             return 1;
         }
-
-        const char *value = "";
 
         if (equal >= 0)
         {
@@ -255,6 +255,26 @@ static int run_export(const struct command *command)
         }
 
         free(name);
+    }
+
+    return 0;
+}
+
+static int run_unset(const struct command *command)
+{
+    for (int i = 1; i < command->count; i++)
+    {
+        if (valid_name(command->arguments[i]) == 0)
+        {
+            fprintf(stderr, "my-42sh: unset: invalid variable name\n");
+            return 1;
+        }
+
+        if (unsetenv(command->arguments[i]) < 0)
+        {
+            perror("my-42sh: unset");
+            return 1;
+        }
     }
 
     return 0;
@@ -277,6 +297,7 @@ int is_builtin(const struct command *command)
         || same_text(command->arguments[0], "env") == 1
         || same_text(command->arguments[0], "cd") == 1
         || same_text(command->arguments[0], "export") == 1
+        || same_text(command->arguments[0], "unset") == 1
         || same_text(command->arguments[0], "exit") == 1)
     {
         return 1;
@@ -320,6 +341,11 @@ int execute_builtin(const struct command *command)
     if (same_text(command->arguments[0], "export") == 1)
     {
         return run_export(command);
+    }
+
+    if (same_text(command->arguments[0], "unset") == 1)
+    {
+        return run_unset(command);
     }
 
     if (same_text(command->arguments[0], "exit") == 1)
