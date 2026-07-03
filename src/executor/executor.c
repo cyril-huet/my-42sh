@@ -1,26 +1,13 @@
 #include "executor.h"
 
+#include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-static int open_redirection(const struct redirection *redirection)
-{
-    if (redirection->type == REDIRECTION_INPUT)
-    {
-        return open(redirection->file, O_RDONLY);
-    }
-
-    if (redirection->type == REDIRECTION_OUTPUT)
-    {
-        return open(redirection->file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    }
-
-    return open(redirection->file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-}
 
 static int apply_redirections(const struct command *command)
 {
@@ -29,20 +16,30 @@ static int apply_redirections(const struct command *command)
         int file;
         int output;
 
-        file = open_redirection(&command->redirections[i]);
+        if (command->redirections[i].type == REDIRECTION_INPUT)
+        {
+            file = open(command->redirections[i].file, O_RDONLY);
+            output = STDIN_FILENO;
+        }
+        else if (command->redirections[i].type == REDIRECTION_OUTPUT)
+        {
+            file = open(command->redirections[i].file,
+                        O_WRONLY | O_CREAT | O_TRUNC,
+                        0644);
+            output = STDOUT_FILENO;
+        }
+        else
+        {
+            file = open(command->redirections[i].file,
+                        O_WRONLY | O_CREAT | O_APPEND,
+                        0644);
+            output = STDOUT_FILENO;
+        }
+
         if (file < 0)
         {
             perror(command->redirections[i].file);
             return -1;
-        }
-
-        if (command->redirections[i].type == REDIRECTION_INPUT)
-        {
-            output = STDIN_FILENO;
-        }
-        else
-        {
-            output = STDOUT_FILENO;
         }
 
         if (dup2(file, output) < 0)
@@ -94,6 +91,21 @@ static void start_child(const struct command *command, int input_fd,
     exit(127);
 }
 
+static int command_status(int status)
+{
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
+
+    if (WIFSIGNALED(status))
+    {
+        return 128 + WTERMSIG(status);
+    }
+
+    return 1;
+}
+
 static int wait_for_children(pid_t *children, int count)
 {
     int result = 1;
@@ -101,16 +113,23 @@ static int wait_for_children(pid_t *children, int count)
     for (int i = 0; i < count; i++)
     {
         int status;
+        pid_t waited;
 
-        if (waitpid(children[i], &status, 0) < 0)
+        do
+        {
+            waited = waitpid(children[i], &status, 0);
+        }
+        while (waited < 0 && errno == EINTR);
+
+        if (waited < 0)
         {
             perror("my-42sh: waitpid");
             continue;
         }
 
-        if (i == count - 1 && WIFEXITED(status))
+        if (i == count - 1)
         {
-            result = WEXITSTATUS(status);
+            result = command_status(status);
         }
     }
 
@@ -137,12 +156,18 @@ int execute_pipeline(const struct pipeline *pipeline)
 
     for (int i = 0; i < pipeline->count; i++)
     {
-        int pipe_fds[2] = { -1, -1 };
+        int pipe_fds[2] = {-1, -1};
         pid_t child;
 
         if (i < pipeline->count - 1 && pipe(pipe_fds) < 0)
         {
             perror("my-42sh: pipe");
+
+            if (input_fd >= 0)
+            {
+                close(input_fd);
+            }
+
             free(children);
             return 1;
         }
@@ -152,13 +177,33 @@ int execute_pipeline(const struct pipeline *pipeline)
         if (child < 0)
         {
             perror("my-42sh: fork");
+
+            if (input_fd >= 0)
+            {
+                close(input_fd);
+            }
+
+            if (pipe_fds[0] >= 0)
+            {
+                close(pipe_fds[0]);
+            }
+
+            if (pipe_fds[1] >= 0)
+            {
+                close(pipe_fds[1]);
+            }
+
             free(children);
             return 1;
         }
 
         if (child == 0)
         {
-            close(pipe_fds[0]);
+            if (pipe_fds[0] >= 0)
+            {
+                close(pipe_fds[0]);
+            }
+
             start_child(&pipeline->commands[i], input_fd, pipe_fds[1]);
         }
 
