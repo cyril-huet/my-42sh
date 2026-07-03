@@ -129,9 +129,19 @@ static int find_equal(const char *text)
 
 static int run_echo(const struct command *command)
 {
-    for (int i = 1; i < command->count; i++)
+    int first_argument = 1;
+    int newline = 1;
+
+    if (command->count > 1
+        && same_text(command->arguments[1], "-n") == 1)
     {
-        if (i > 1)
+        first_argument = 2;
+        newline = 0;
+    }
+
+    for (int i = first_argument; i < command->count; i++)
+    {
+        if (i > first_argument)
         {
             printf(" ");
         }
@@ -139,7 +149,11 @@ static int run_echo(const struct command *command)
         printf("%s", command->arguments[i]);
     }
 
-    printf("\n");
+    if (newline == 1)
+    {
+        printf("\n");
+    }
+
     return 0;
 }
 
@@ -165,6 +179,25 @@ static int run_env(void)
     {
         printf("%s\n", environ[index]);
         index++;
+    }
+
+    return 0;
+}
+
+static int update_pwd(void)
+{
+    char path[PATH_MAX];
+
+    if (getcwd(path, sizeof(path)) == NULL)
+    {
+        perror("my-42sh: cd");
+        return 1;
+    }
+
+    if (setenv("PWD", path, 1) < 0)
+    {
+        perror("my-42sh: cd");
+        return 1;
     }
 
     return 0;
@@ -201,7 +234,7 @@ static int run_cd(const struct command *command)
         return 1;
     }
 
-    return 0;
+    return update_pwd();
 }
 
 static int run_export(const struct command *command)
