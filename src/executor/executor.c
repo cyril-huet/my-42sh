@@ -56,6 +56,16 @@ static int apply_redirections(const struct command *command)
 static void start_child(const struct command *command, int input_fd,
                         int output_fd)
 {
+        signal(SIGINT, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
+
+    if (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)
+    {
+        perror("my-42sh: dup2");
+        exit(1);
+    }
+
     if (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)
     {
         perror("my-42sh: dup2");

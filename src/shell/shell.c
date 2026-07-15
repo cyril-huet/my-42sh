@@ -1,7 +1,10 @@
 #include "shell.h"
 
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include "builtins.h"
 #include "executor.h"
@@ -10,6 +13,19 @@
 #include "variables.h"
 
 #define MAX_LINE_LENGTH 4096
+
+static void handle_sigint(int signal_number)
+{
+    (void)signal_number;
+    write(STDOUT_FILENO, "\n", 1);
+}
+
+static void install_signal_handlers(void)
+{
+    signal(SIGINT, handle_sigint);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+}
 
 static void remove_newline(char *line)
 {
@@ -135,6 +151,8 @@ int shell_run(struct shell_state *state)
     char line[MAX_LINE_LENGTH];
     int result = 0;
 
+    install_signal_handlers();
+
     while (1)
     {
         check_background_process(state);
@@ -144,6 +162,12 @@ int shell_run(struct shell_state *state)
 
         if (fgets(line, sizeof(line), stdin) == NULL)
         {
+            if (errno == EINTR)
+            {
+                clearerr(stdin);
+                continue;
+            }
+
             printf("\n");
             break;
         }
