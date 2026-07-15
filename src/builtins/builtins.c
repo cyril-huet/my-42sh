@@ -132,8 +132,7 @@ static int run_echo(const struct command *command)
     int first_argument = 1;
     int newline = 1;
 
-    if (command->count > 1
-        && same_text(command->arguments[1], "-n") == 1)
+    if (command->count > 1 && same_text(command->arguments[1], "-n") == 1)
     {
         first_argument = 2;
         newline = 0;

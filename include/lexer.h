@@ -9,6 +9,7 @@
 #define TOKEN_REDIRECTION_OUTPUT 5
 #define TOKEN_REDIRECTION_APPEND 6
 #define TOKEN_SEQUENCE 7
+#define TOKEN_BACKGROUND 8
 
 struct token
 {

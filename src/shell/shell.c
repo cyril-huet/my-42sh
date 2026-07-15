@@ -1,11 +1,13 @@
 #include "shell.h"
 
 #include <stdio.h>
+#include <sys/wait.h>
 
 #include "builtins.h"
 #include "executor.h"
 #include "lexer.h"
 #include "parser.h"
+#include "variables.h"
 
 #define MAX_LINE_LENGTH 4096
 
@@ -22,6 +24,22 @@ static void remove_newline(char *line)
         }
 
         index++;
+    }
+}
+
+static void check_background_process(struct shell_state *state)
+{
+    int status;
+
+    if (state->last_background <= 0)
+    {
+        return;
+    }
+
+    if (waitpid(state->last_background, &status, WNOHANG)
+        == state->last_background)
+    {
+        state->last_background = 0;
     }
 }
 
@@ -71,7 +89,17 @@ int shell_run_line(const char *line, struct shell_state *state)
 
     for (int i = 0; i < commands.count; i++)
     {
-        result = execute_one_pipeline(&commands.pipelines[i]);
+        struct pipeline *pipeline = &commands.pipelines[i];
+
+        if (pipeline->background == 1)
+        {
+            result =
+                execute_pipeline_background(pipeline, &state->last_background);
+        }
+        else
+        {
+            result = execute_one_pipeline(pipeline);
+        }
 
         if (result == 2)
         {
@@ -109,6 +137,8 @@ int shell_run(struct shell_state *state)
 
     while (1)
     {
+        check_background_process(state);
+
         printf("my-42sh$ ");
         fflush(stdout);
 

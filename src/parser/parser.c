@@ -316,6 +316,7 @@ void pipeline_init(struct pipeline *pipeline)
     pipeline->commands = NULL;
     pipeline->count = 0;
     pipeline->capacity = 0;
+    pipeline->background = 0;
 }
 
 void pipeline_free(struct pipeline *pipeline)
@@ -380,10 +381,14 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
             }
         }
         else if (token->type == TOKEN_AND || token->type == TOKEN_OR
-                 || token->type == TOKEN_SEQUENCE)
+                 || token->type == TOKEN_SEQUENCE
+                 || token->type == TOKEN_BACKGROUND)
         {
             int operator;
-
+            if (token->type == TOKEN_BACKGROUND)
+            {
+                current_pipeline.background = 1;
+            }
             if (finish_command(&current_pipeline, &current_command) < 0
                 || current_pipeline.count == 0
                 || add_pipeline(list, &current_pipeline) < 0)
@@ -454,11 +459,28 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
         return 0;
     }
 
-    if (finish_command(&current_pipeline, &current_command) < 0
-        || current_pipeline.count == 0
-        || add_pipeline(list, &current_pipeline) < 0)
+    if (current_command.count > 0)
+    {
+        if (finish_command(&current_pipeline, &current_command) < 0)
+        {
+            return parser_error(list, &current_pipeline, &current_command);
+        }
+    }
+
+    if (current_pipeline.count > 0)
+    {
+        if (add_pipeline(list, &current_pipeline) < 0)
+        {
+            return parser_error(list, &current_pipeline, &current_command);
+        }
+    }
+    else if (tokens->items[tokens->count - 1].type != TOKEN_BACKGROUND)
     {
         return parser_error(list, &current_pipeline, &current_command);
+    }
+    else if (list->operator_count > 0)
+    {
+        list->operator_count--;
     }
 
     return 0;

@@ -162,6 +162,10 @@ static int read_word(const char *line, int *index, char *word, int *type)
                         (*index)++;
                         *type = TOKEN_AND;
                     }
+                    else
+                    {
+                        *type = TOKEN_BACKGROUND;
+                    }
                 }
                 else if (current == ';')
                 {

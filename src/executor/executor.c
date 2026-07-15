@@ -24,15 +24,13 @@ static int apply_redirections(const struct command *command)
         else if (command->redirections[i].type == REDIRECTION_OUTPUT)
         {
             file = open(command->redirections[i].file,
-                        O_WRONLY | O_CREAT | O_TRUNC,
-                        0644);
+                        O_WRONLY | O_CREAT | O_TRUNC, 0644);
             output = STDOUT_FILENO;
         }
         else
         {
             file = open(command->redirections[i].file,
-                        O_WRONLY | O_CREAT | O_APPEND,
-                        0644);
+                        O_WRONLY | O_CREAT | O_APPEND, 0644);
             output = STDOUT_FILENO;
         }
 
@@ -118,8 +116,7 @@ static int wait_for_children(pid_t *children, int count)
         do
         {
             waited = waitpid(children[i], &status, 0);
-        }
-        while (waited < 0 && errno == EINTR);
+        } while (waited < 0 && errno == EINTR);
 
         if (waited < 0)
         {
@@ -156,7 +153,7 @@ int execute_pipeline(const struct pipeline *pipeline)
 
     for (int i = 0; i < pipeline->count; i++)
     {
-        int pipe_fds[2] = {-1, -1};
+        int pipe_fds[2] = { -1, -1 };
         pid_t child;
 
         if (i < pipeline->count - 1 && pipe(pipe_fds) < 0)
@@ -231,4 +228,28 @@ int execute_pipeline(const struct pipeline *pipeline)
 
     free(children);
     return result;
+}
+
+int execute_pipeline_background(const struct pipeline *pipeline,
+                                int *process_id)
+{
+    pid_t child;
+
+    child = fork();
+
+    if (child < 0)
+    {
+        perror("my-42sh: fork");
+        return 1;
+    }
+
+    if (child == 0)
+    {
+        int result = execute_pipeline(pipeline);
+
+        exit(result);
+    }
+
+    *process_id = child;
+    return 0;
 }

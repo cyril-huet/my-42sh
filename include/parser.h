@@ -32,6 +32,7 @@ struct pipeline
     struct command *commands;
     int count;
     int capacity;
+    int background;
 };
 
 struct command_list
