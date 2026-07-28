@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -69,12 +71,121 @@ static int execute_one_pipeline(struct pipeline *pipeline)
 
     return execute_pipeline(pipeline);
 }
+static int find_subshell_bounds(const char *line, int *start, int *end)
+{
+    int length = 0;
 
+    while (line[length] != '\0')
+    {
+        length++;
+    }
+
+    *start = 0;
+    while (*start < length && (line[*start] == ' ' || line[*start] == '\t'))
+    {
+        (*start)++;
+    }
+
+    *end = length - 1;
+    while (*end >= *start && (line[*end] == ' ' || line[*end] == '\t'))
+    {
+        (*end)--;
+    }
+
+    if (*start >= *end)
+    {
+        return 0;
+    }
+
+    if (line[*start] != '(' || line[*end] != ')')
+    {
+        return 0;
+    }
+
+    return 1;
+}
+static char *copy_subshell_line(const char *line, int start, int end)
+{
+    int length = end - start - 1;
+    char *inside = malloc(sizeof(char) * (length + 1));
+
+    if (inside == NULL)
+    {
+        return NULL;
+    }
+
+    for (int i = 0; i < length; i++)
+    {
+        inside[i] = line[start + 1 + i];
+    }
+
+    inside[length] = '\0';
+    return inside;
+}
+static int run_subshell(const char *line, struct shell_state *state, int start,
+                        int end)
+{
+    char *inside;
+    pid_t child;
+    int status;
+
+    inside = copy_subshell_line(line, start, end);
+    if (inside == NULL)
+    {
+        fprintf(stderr, "my-42sh: memory allocation failed\n");
+        return 1;
+    }
+
+    child = fork();
+
+    if (child < 0)
+    {
+        perror("my-42sh: fork");
+        free(inside);
+        return 1;
+    }
+
+    if (child == 0)
+    {
+        struct shell_state child_state = *state;
+        int result = shell_run_line(inside, &child_state);
+
+        free(inside);
+        exit(result);
+    }
+
+    free(inside);
+
+    if (waitpid(child, &status, 0) < 0)
+    {
+        perror("my-42sh: waitpid");
+        return 1;
+    }
+
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
+
+    if (WIFSIGNALED(status))
+    {
+        return 128 + WTERMSIG(status);
+    }
+
+    return 1;
+}
 int shell_run_line(const char *line, struct shell_state *state)
 {
     struct token_list tokens;
     struct command_list commands;
+    int start;
+    int end;
     int result = 0;
+
+    if (find_subshell_bounds(line, &start, &end) == 1)
+    {
+        return run_subshell(line, state, start, end);
+    }
 
     token_list_init(&tokens);
     command_list_init(&commands);

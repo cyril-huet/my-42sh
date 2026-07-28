@@ -56,7 +56,7 @@ static int apply_redirections(const struct command *command)
 static void start_child(const struct command *command, int input_fd,
                         int output_fd)
 {
-        signal(SIGINT, SIG_DFL);
+    signal(SIGINT, SIG_DFL);
     signal(SIGQUIT, SIG_DFL);
     signal(SIGTSTP, SIG_DFL);
 
