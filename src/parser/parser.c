@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 static char *copy_text(const char *text)
@@ -27,6 +28,67 @@ static char *copy_text(const char *text)
     return copy;
 }
 
+static const char *token_text(const struct token *token)
+{
+    if (token == NULL)
+    {
+        return "end of command";
+    }
+
+    if (token->value != NULL)
+    {
+        return token->value;
+    }
+
+    if (token->type == TOKEN_PIPE)
+    {
+        return "|";
+    }
+
+    if (token->type == TOKEN_AND)
+    {
+        return "&&";
+    }
+
+    if (token->type == TOKEN_OR)
+    {
+        return "||";
+    }
+
+    if (token->type == TOKEN_SEQUENCE)
+    {
+        return ";";
+    }
+
+    if (token->type == TOKEN_BACKGROUND)
+    {
+        return "&";
+    }
+
+    if (token->type == TOKEN_REDIRECTION_INPUT)
+    {
+        return "<";
+    }
+
+    if (token->type == TOKEN_REDIRECTION_OUTPUT)
+    {
+        return ">";
+    }
+
+    if (token->type == TOKEN_REDIRECTION_APPEND)
+    {
+        return ">>";
+    }
+
+    return "unknown";
+}
+
+static void print_syntax_error(const struct token *token, const char *message)
+{
+    fprintf(stderr, "my-42sh: syntax error near '%s': %s\n", token_text(token),
+            message);
+}
+
 static int increase_command_capacity(struct command *command)
 {
     int new_capacity;
@@ -42,7 +104,6 @@ static int increase_command_capacity(struct command *command)
     }
 
     new_arguments = realloc(command->arguments, sizeof(char *) * new_capacity);
-
     if (new_arguments == NULL)
     {
         return -1;
@@ -94,7 +155,6 @@ static int increase_redirection_capacity(struct command *command)
 
     new_redirections = realloc(command->redirections,
                                sizeof(struct redirection) * new_capacity);
-
     if (new_redirections == NULL)
     {
         return -1;
@@ -146,7 +206,6 @@ static int increase_pipeline_capacity(struct pipeline *pipeline)
 
     new_commands =
         realloc(pipeline->commands, sizeof(struct command) * new_capacity);
-
     if (new_commands == NULL)
     {
         return -1;
@@ -190,7 +249,6 @@ static int increase_list_capacity(struct command_list *list)
 
     new_pipelines =
         realloc(list->pipelines, sizeof(struct pipeline) * new_capacity);
-
     if (new_pipelines == NULL)
     {
         return -1;
@@ -233,7 +291,6 @@ static int increase_operator_capacity(struct command_list *list)
     }
 
     new_operators = realloc(list->operators, sizeof(int) * new_capacity);
-
     if (new_operators == NULL)
     {
         return -1;
@@ -244,7 +301,7 @@ static int increase_operator_capacity(struct command_list *list)
     return 0;
 }
 
-static int add_operator(struct command_list *list, int operator)
+static int add_operator(struct command_list *list, int operator_type)
 {
     if (list->operator_count == list->operator_capacity)
     {
@@ -254,8 +311,9 @@ static int add_operator(struct command_list *list, int operator)
         }
     }
 
-    list->operators[list->operator_count] = operator;
+    list->operators[list->operator_count] = operator_type;
     list->operator_count++;
+
     return 0;
 }
 
@@ -270,11 +328,15 @@ static int finish_command(struct pipeline *pipeline, struct command *command)
 }
 
 static int parser_error(struct command_list *list, struct pipeline *pipeline,
-                        struct command *command)
+                        struct command *command, const struct token *token,
+                        const char *message)
 {
+    print_syntax_error(token, message);
+
     command_free(command);
     pipeline_free(pipeline);
     command_list_free(list);
+
     return -1;
 }
 
@@ -303,12 +365,7 @@ void command_free(struct command *command)
     free(command->arguments);
     free(command->redirections);
 
-    command->arguments = NULL;
-    command->count = 0;
-    command->capacity = 0;
-    command->redirections = NULL;
-    command->redirection_count = 0;
-    command->redirection_capacity = 0;
+    command_init(command);
 }
 
 void pipeline_init(struct pipeline *pipeline)
@@ -327,10 +384,7 @@ void pipeline_free(struct pipeline *pipeline)
     }
 
     free(pipeline->commands);
-
-    pipeline->commands = NULL;
-    pipeline->count = 0;
-    pipeline->capacity = 0;
+    pipeline_init(pipeline);
 }
 
 void command_list_init(struct command_list *list)
@@ -353,12 +407,7 @@ void command_list_free(struct command_list *list)
     free(list->pipelines);
     free(list->operators);
 
-    list->pipelines = NULL;
-    list->count = 0;
-    list->capacity = 0;
-    list->operators = NULL;
-    list->operator_count = 0;
-    list->operator_capacity = 0;
+    command_list_init(list);
 }
 
 int parser_run(const struct token_list *tokens, struct command_list *list)
@@ -366,8 +415,19 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
     struct pipeline current_pipeline;
     struct command current_command;
 
+    if (tokens == NULL || list == NULL)
+    {
+        return -1;
+    }
+
+    command_list_init(list);
     pipeline_init(&current_pipeline);
     command_init(&current_command);
+
+    if (tokens->count == 0)
+    {
+        return 0;
+    }
 
     for (int i = 0; i < tokens->count; i++)
     {
@@ -377,41 +437,57 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
         {
             if (finish_command(&current_pipeline, &current_command) < 0)
             {
-                return parser_error(list, &current_pipeline, &current_command);
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "expected a command before '|'");
             }
         }
         else if (token->type == TOKEN_AND || token->type == TOKEN_OR
                  || token->type == TOKEN_SEQUENCE
                  || token->type == TOKEN_BACKGROUND)
         {
-            int operator;
+            int operator_type;
+
+            if (current_command.count == 0)
+            {
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token,
+                                    "expected a command before operator");
+            }
+
             if (token->type == TOKEN_BACKGROUND)
             {
                 current_pipeline.background = 1;
             }
-            if (finish_command(&current_pipeline, &current_command) < 0
-                || current_pipeline.count == 0
-                || add_pipeline(list, &current_pipeline) < 0)
+
+            if (finish_command(&current_pipeline, &current_command) < 0)
             {
-                return parser_error(list, &current_pipeline, &current_command);
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "could not finish command");
+            }
+
+            if (add_pipeline(list, &current_pipeline) < 0)
+            {
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "not enough memory");
             }
 
             if (token->type == TOKEN_AND)
             {
-                operator= LOGICAL_AND;
+                operator_type = LOGICAL_AND;
             }
             else if (token->type == TOKEN_OR)
             {
-                operator= LOGICAL_OR;
+                operator_type = LOGICAL_OR;
             }
             else
             {
-                operator= LOGICAL_SEQUENCE;
+                operator_type = LOGICAL_SEQUENCE;
             }
 
-            if (add_operator(list, operator) < 0)
+            if (add_operator(list, operator_type) < 0)
             {
-                return parser_error(list, &current_pipeline, &current_command);
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "not enough memory");
             }
         }
         else if (token->type == TOKEN_REDIRECTION_INPUT
@@ -420,10 +496,17 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
         {
             int redirection;
 
-            if (i + 1 >= tokens->count
-                || tokens->items[i + 1].type != TOKEN_WORD)
+            if (i + 1 >= tokens->count)
             {
-                return parser_error(list, &current_pipeline, &current_command);
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "expected a file after redirection");
+            }
+
+            if (tokens->items[i + 1].type != TOKEN_WORD)
+            {
+                return parser_error(list, &current_pipeline, &current_command,
+                                    &tokens->items[i + 1],
+                                    "expected a file after redirection");
             }
 
             if (token->type == TOKEN_REDIRECTION_INPUT)
@@ -443,44 +526,72 @@ int parser_run(const struct token_list *tokens, struct command_list *list)
                                 tokens->items[i + 1].value)
                 < 0)
             {
-                return parser_error(list, &current_pipeline, &current_command);
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "not enough memory");
             }
 
             i++;
         }
-        else if (add_argument(&current_command, token->value) < 0)
+        else if (token->type == TOKEN_WORD)
         {
-            return parser_error(list, &current_pipeline, &current_command);
+            if (add_argument(&current_command, token->value) < 0)
+            {
+                return parser_error(list, &current_pipeline, &current_command,
+                                    token, "not enough memory");
+            }
         }
-    }
-
-    if (tokens->count == 0)
-    {
-        return 0;
+        else
+        {
+            return parser_error(list, &current_pipeline, &current_command,
+                                token, "unexpected token");
+        }
     }
 
     if (current_command.count > 0)
     {
         if (finish_command(&current_pipeline, &current_command) < 0)
         {
-            return parser_error(list, &current_pipeline, &current_command);
+            return parser_error(list, &current_pipeline, &current_command, NULL,
+                                "could not finish command");
         }
     }
 
     if (current_pipeline.count > 0)
     {
+        if (tokens->items[tokens->count - 1].type == TOKEN_PIPE)
+        {
+            return parser_error(list, &current_pipeline, &current_command, NULL,
+                                "expected a command after '|'");
+        }
+
         if (add_pipeline(list, &current_pipeline) < 0)
         {
-            return parser_error(list, &current_pipeline, &current_command);
+            return parser_error(list, &current_pipeline, &current_command, NULL,
+                                "not enough memory");
         }
     }
-    else if (tokens->items[tokens->count - 1].type != TOKEN_BACKGROUND)
+    else
     {
-        return parser_error(list, &current_pipeline, &current_command);
-    }
-    else if (list->operator_count > 0)
-    {
-        list->operator_count--;
+        int last_type = tokens->items[tokens->count - 1].type;
+
+        if (last_type == TOKEN_AND || last_type == TOKEN_OR)
+        {
+            return parser_error(list, &current_pipeline, &current_command, NULL,
+                                "expected a command after operator");
+        }
+
+        if (last_type == TOKEN_SEQUENCE || last_type == TOKEN_BACKGROUND)
+        {
+            if (list->operator_count > 0)
+            {
+                list->operator_count--;
+            }
+        }
+        else
+        {
+            return parser_error(list, &current_pipeline, &current_command, NULL,
+                                "expected a command");
+        }
     }
 
     return 0;
