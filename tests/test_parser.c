@@ -1,11 +1,10 @@
-#include "lexer.h"
-#include "parser.h"
-
 #include <stdio.h>
 #include <string.h>
 
-static int parse_line(const char *line,
-                      struct token_list *tokens,
+#include "lexer.h"
+#include "parser.h"
+
+static int parse_line(const char *line, struct token_list *tokens,
                       struct command_list *commands)
 {
     token_list_init(tokens);
@@ -33,10 +32,8 @@ static int test_simple_command(void)
 
     command = &commands.pipelines[0].commands[0];
 
-    result = commands.count == 1
-        && commands.pipelines[0].count == 1
-        && command->count == 2
-        && strcmp(command->arguments[0], "echo") == 0
+    result = commands.count == 1 && commands.pipelines[0].count == 1
+        && command->count == 2 && strcmp(command->arguments[0], "echo") == 0
         && strcmp(command->arguments[1], "hello") == 0;
 
     token_list_free(&tokens);
@@ -55,8 +52,7 @@ static int test_pipeline(void)
         return 0;
     }
 
-    result = commands.count == 1
-        && commands.pipelines[0].count == 2
+    result = commands.count == 1 && commands.pipelines[0].count == 2
         && commands.pipelines[0].commands[0].count == 2
         && commands.pipelines[0].commands[1].count == 2;
 
@@ -72,8 +68,7 @@ static int test_redirections(void)
     struct command *command;
     int result;
 
-    if (parse_line("cat < input > output >> log",
-                   &tokens, &commands) < 0)
+    if (parse_line("cat < input > output >> log", &tokens, &commands) < 0)
     {
         return 0;
     }
@@ -99,14 +94,12 @@ static int test_logical_operators(void)
     struct command_list commands;
     int result;
 
-    if (parse_line("true && echo yes || echo no; pwd",
-                   &tokens, &commands) < 0)
+    if (parse_line("true && echo yes || echo no; pwd", &tokens, &commands) < 0)
     {
         return 0;
     }
 
-    result = commands.count == 4
-        && commands.operator_count == 3
+    result = commands.count == 4 && commands.operator_count == 3
         && commands.operators[0] == LOGICAL_AND
         && commands.operators[1] == LOGICAL_OR
         && commands.operators[2] == LOGICAL_SEQUENCE;
@@ -122,14 +115,12 @@ static int test_background(void)
     struct command_list commands;
     int result;
 
-    if (parse_line("sleep 1 & echo done",
-                   &tokens, &commands) < 0)
+    if (parse_line("sleep 1 & echo done", &tokens, &commands) < 0)
     {
         return 0;
     }
 
-    result = commands.count == 2
-        && commands.pipelines[0].background == 1
+    result = commands.count == 2 && commands.pipelines[0].background == 1
         && commands.operator_count == 1
         && commands.operators[0] == LOGICAL_SEQUENCE;
 
@@ -163,10 +154,8 @@ static int parser_rejects(const char *line)
 
 static int test_invalid_commands(void)
 {
-    return parser_rejects("| echo hello")
-        && parser_rejects("echo hello |")
-        && parser_rejects("echo hello >")
-        && parser_rejects("echo hello &&");
+    return parser_rejects("| echo hello") && parser_rejects("echo hello |")
+        && parser_rejects("echo hello >") && parser_rejects("echo hello &&");
 }
 
 static void print_result(const char *name, int result)

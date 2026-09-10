@@ -1,10 +1,10 @@
-#include "lexer.h"
-
 #include <stdio.h>
 #include <string.h>
 
-static int token_is(const struct token_list *list, int index,
-                    int type, const char *value)
+#include "lexer.h"
+
+static int token_is(const struct token_list *list, int index, int type,
+                    const char *value)
 {
     if (index >= list->count)
     {
@@ -37,8 +37,7 @@ static int test_words(void)
         return 0;
     }
 
-    result = list.count == 2
-        && token_is(&list, 0, TOKEN_WORD, "echo")
+    result = list.count == 2 && token_is(&list, 0, TOKEN_WORD, "echo")
         && token_is(&list, 1, TOKEN_WORD, "hello");
 
     token_list_free(&list);
@@ -58,8 +57,7 @@ static int test_quotes(void)
         return 0;
     }
 
-    result = list.count == 3
-        && token_is(&list, 0, TOKEN_WORD, "echo")
+    result = list.count == 3 && token_is(&list, 0, TOKEN_WORD, "echo")
         && token_is(&list, 1, TOKEN_WORD, "hello world")
         && token_is(&list, 2, TOKEN_WORD, "test");
 
@@ -80,8 +78,7 @@ static int test_pipes(void)
         return 0;
     }
 
-    result = list.count == 5
-        && token_is(&list, 0, TOKEN_WORD, "echo")
+    result = list.count == 5 && token_is(&list, 0, TOKEN_WORD, "echo")
         && token_is(&list, 1, TOKEN_WORD, "hello")
         && token_is(&list, 2, TOKEN_PIPE, "|")
         && token_is(&list, 3, TOKEN_WORD, "wc")
@@ -104,8 +101,7 @@ static int test_logical_operators(void)
         return 0;
     }
 
-    result = list.count == 7
-        && token_is(&list, 1, TOKEN_AND, "&&")
+    result = list.count == 7 && token_is(&list, 1, TOKEN_AND, "&&")
         && token_is(&list, 4, TOKEN_OR, "||");
 
     token_list_free(&list);
@@ -125,8 +121,7 @@ static int test_redirections(void)
         return 0;
     }
 
-    result = list.count == 7
-        && token_is(&list, 1, TOKEN_REDIRECTION_INPUT, "<")
+    result = list.count == 7 && token_is(&list, 1, TOKEN_REDIRECTION_INPUT, "<")
         && token_is(&list, 3, TOKEN_REDIRECTION_OUTPUT, ">")
         && token_is(&list, 5, TOKEN_REDIRECTION_APPEND, ">>");
 
@@ -147,8 +142,7 @@ static int test_sequence_and_background(void)
         return 0;
     }
 
-    result = list.count == 7
-        && token_is(&list, 2, TOKEN_BACKGROUND, "&")
+    result = list.count == 7 && token_is(&list, 2, TOKEN_BACKGROUND, "&")
         && token_is(&list, 5, TOKEN_SEQUENCE, ";");
 
     token_list_free(&list);
