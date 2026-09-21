@@ -3,13 +3,19 @@
 
 #include "lexer.h"
 
-#define REDIRECTION_INPUT 1
-#define REDIRECTION_OUTPUT 2
-#define REDIRECTION_APPEND 3
+enum redirection_type
+{
+    REDIRECTION_INPUT,
+    REDIRECTION_OUTPUT,
+    REDIRECTION_APPEND
+};
 
-#define LOGICAL_AND 1
-#define LOGICAL_OR 2
-#define LOGICAL_SEQUENCE 3
+enum logical_operator
+{
+    LOGICAL_AND,
+    LOGICAL_OR,
+    LOGICAL_SEQUENCE
+};
 
 struct redirection
 {

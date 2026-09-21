@@ -66,12 +66,6 @@ static void start_child(const struct command *command, int input_fd,
         exit(1);
     }
 
-    if (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)
-    {
-        perror("my-42sh: dup2");
-        exit(1);
-    }
-
     if (output_fd >= 0 && dup2(output_fd, STDOUT_FILENO) < 0)
     {
         perror("my-42sh: dup2");

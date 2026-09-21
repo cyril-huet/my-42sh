@@ -1,8 +1,12 @@
-# Program
+# Build files
 my-42sh
-
-# Object files
+lexer-tests
+parser-tests
 *.o
 
-# Test files
-*.log
+# macOS files
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
