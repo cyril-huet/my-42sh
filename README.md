@@ -3,6 +3,7 @@
 [![Language](https://img.shields.io/badge/language-C99-00599C)](https://en.wikipedia.org/wiki/C99)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/cyril-huet/my-42sh/actions/workflows/ci.yml/badge.svg)](https://github.com/cyril-huet/my-42sh/actions/workflows/ci.yml)
 
 `my-42sh` is a small Unix shell written in C99.
 
