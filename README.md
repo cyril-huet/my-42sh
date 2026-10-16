@@ -165,8 +165,8 @@ Use a subshell:
 Use environment variables:
 
 ```sh
-./my-42sh "echo $HOME"
-./my-42sh "echo $?"
+./my-42sh 'echo $HOME'
+./my-42sh 'echo $?'
 ```
 
 ## Tests
